@@ -1,0 +1,63 @@
+<!-- POSpanel.html — v0.7.2 | WOTD flyttet til TopNav; produktliste med lokal qty + handlekurv -->
+<?var __EXEC = EXEC_URL, __UID = (UID||''), __ROLE = (ROLE||''); ?>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"><title>POS</title><meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>window.__EXEC_URL="<?= __EXEC ?>";window.__UID="<?= __UID ?>";window.__ROLE="<?= __ROLE ?>";</script>
+  <style>
+    body{margin:0;background:#0e1512;color:#e6f0ec;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    .wrap{padding:16px}.card{padding:12px;border:1px solid #16352b;border-radius:10px;background:#0f1a16;margin-bottom:16px}
+    input{background:#0b1a15;color:#e6f0ec;border:1px solid #27433a;border-radius:8px;padding:.45rem .6rem}
+    .btn{appearance:none;border:0;border-radius:8px;padding:.5rem .7rem;background:#2da37e;color:#05130f;font-weight:700;cursor:pointer}
+    table{border-collapse:collapse;width:100%;background:#0f1a16} th,td{border:1px solid #1b2c26;padding:6px 8px;font-size:.92rem}
+    th{background:#13221d;color:#cfe5dd;text-align:left} .hidden{display:none} .grid{display:grid;gap:16px;grid-template-columns:2fr 1fr}
+  </style>
+</head>
+<body>
+  <?!= include('TopNav') ?>
+  <div class="wrap">
+    <div id="pos" class="grid">
+      <div class="card">
+        <h2>Products</h2>
+        <table id="tbl"><thead><tr><th>SKU</th><th>Label</th><th>Price</th><th>Local</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h2>Cart</h2>
+        <table id="cart"><thead><tr><th>SKU</th><th>Qty</th><th>Price</th><th>Sum</th><th></th></tr></thead><tbody></tbody></table>
+        <div style="margin-top:8px">Total: <span id="total">0</span></div>
+        <div class="row" style="margin-top:8px"><input id="cust" placeholder="Customer UID (WalkIn default)"></div>
+        <div style="margin-top:8px"><button class="btn" onclick="checkout()">Checkout</button></div>
+        <div id="msg" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const role = String(window.__ROLE||'').toLowerCase();
+    const cart = new Map();
+    function setRows(rows){
+      const tb=document.querySelector('#tbl tbody');
+      tb.innerHTML = rows.map(p=>{
+        const sku=p.ProductCode, label=p.Label||sku, price=Number(p.Price||0).toFixed(2), local=(Number(p.LocalQty||0)||0);
+        return `<tr><td>${sku}</td><td>${label}</td><td>${price}</td><td>${local}</td><td><button class="btn" onclick="add('${sku}','${label.replace(/'/g,"&#39;")}',${price})"${local<=0?' disabled':''}>Add</button></td></tr>`;
+      }).join('');
+    }
+    function load(){ google.script.run.withSuccessHandler(setRows).withFailureHandler(console.error).posListProducts(window.__UID, role); }
+    function add(sku,label,price){ const cur=cart.get(sku)||{sku,label,price:Number(price),qty:0}; cur.qty+=1; cart.set(sku,cur); drawCart(); }
+    function inc(sku){ const it=cart.get(sku); if(!it) return; it.qty+=1; drawCart(); }
+    function dec(sku){ const it=cart.get(sku); if(!it) return; it.qty=Math.max(0,it.qty-1); if(it.qty===0) cart.delete(sku); drawCart(); }
+    function drawCart(){ const tb=document.querySelector('#cart tbody'); const rows=[...cart.values()];
+      tb.innerHTML = rows.map(it=>{ const sum=(it.qty*it.price).toFixed(2);
+        return `<tr><td>${it.sku}</td><td>${it.qty} <button class="btn" onclick="inc('${it.sku}')">+</button> <button class="btn" onclick="dec('${it.sku}')">−</button></td><td>${it.price.toFixed(2)}</td><td>${sum}</td><td><button class="btn" onclick="removeItem('${it.sku}')">X</button></td></tr>`; }).join('');
+      const total=rows.reduce((a,it)=>a+it.qty*it.price,0); document.getElementById('total').textContent=total.toFixed(2); }
+    function removeItem(sku){ cart.delete(sku); drawCart(); }
+    function checkout(){ const items=[...cart.values()].map(it=>({sku:it.sku, qty:it.qty, price:it.price})); if(items.length===0){ document.getElementById('msg').textContent='Empty cart'; return; }
+      const cust=(document.getElementById('cust').value||'WalkIn').trim()||'WalkIn';
+      google.script.run.withSuccessHandler(res=>{
+        if(res&&res.ok){ document.getElementById('msg').textContent='OK '+res.saleId+' total '+res.total.toFixed(2); cart.clear(); drawCart(); load(); }
+        else { document.getElementById('msg').textContent='Failed'; }
+      }).withFailureHandler(e=>document.getElementById('msg').textContent=e.message||String(e)).posCreateSale(window.__UID, items, cust); }
+    document.addEventListener('DOMContentLoaded', load);
+  </script>
+</body>
+</html>

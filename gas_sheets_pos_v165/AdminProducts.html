@@ -1,0 +1,146 @@
+<!-- AdminProducts.html | v0.6.3 | 2025-10-23 | admin for produkter + batch pakker -->
+<section>
+<h2>Produkter</h2>
+
+<details open>
+<summary><strong>Ny / Endre produkt</strong></summary>
+<div style="display:grid;grid-template-columns:repeat(6, minmax(140px,1fr));gap:8px;margin:8px 0">
+<input id="p_id" placeholder="ProductID">
+<input id="p_cat" placeholder="Kategori">
+<input id="p_name" placeholder="Navn">
+<input id="p_unit" placeholder="ContentUnit" value="g">
+<input id="p_punit" placeholder="PriceUnit" value="g">
+<label style="display:flex;align-items:center;gap:6px"><input id="p_active" type="checkbox" checked>Aktiv</label>
+<input id="p_dprice" type="number" step="0.01" placeholder="DispensaryPrice">
+<input id="p_mprice" type="number" step="0.01" placeholder="MarketPrice">
+<button id="p_save">Lagre</button>
+<span id="p_msg" style="grid-column:1/-1;color:#444"></span>
+</div>
+</details>
+
+<details open style="margin-top:12px">
+<summary><strong>Batch: Pakker</strong></summary>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0">
+<input id="b_pid" placeholder="ProductID">
+<select id="b_mode">
+<option value="loose">Løsvekt</option>
+<option value="prepack" selected>Ferdig pakning</option>
+</select>
+<input id="b_count" type="number" min="1" value="10" title="Antall pakker">
+<input id="b_qty" type="number" step="0.01" placeholder="ContentQty (for løsvekt)">
+<input id="b_unit" placeholder="Unit (for løsvekt)" value="g">
+<button id="b_make">Lag pakker</button>
+<span id="b_msg" style="color:#444"></span>
+</div>
+<small>Tips: Ferdig pakning bruker ContentQty/Unit fra produktet. Løsvekt bruker feltene over.</small>
+</details>
+
+<details open style="margin-top:12px">
+<summary><strong>Produktliste</strong></summary>
+<div style="margin:8px 0;display:flex;gap:8px;align-items:center">
+<input id="q" type="search" placeholder="Søk navn/kategori...">
+<button id="btn-refresh">Oppdater</button>
+<span id="stat" style="margin-left:auto;color:#666"></span>
+</div>
+<table id="prods" border="1" cellpadding="6" cellspacing="0" style="width:100%">
+<thead><tr><th>ProductID</th><th>Kategori</th><th>Navn</th><th>Unit</th><th>DispPris</th><th>MarkPris</th><th>Aktiv</th><th>→ Skjema</th></tr></thead>
+<tbody></tbody>
+</table>
+</details>
+</section>
+
+<script>
+const E = id => document.getElementById(id);
+
+function load(){
+E('stat').textContent='Laster...';
+google.script.run.withSuccessHandler(function(list){
+const q = (E('q').value||'').toLowerCase().trim();
+const rows = (list||[]).filter(function(r){
+if(!q) return true;
+return String(r.Name||'').toLowerCase().includes(q) || String(r.Category||'').toLowerCase().includes(q);
+});
+const tb = E('prods').querySelector('tbody');
+tb.innerHTML = rows.map(function(r,i){
+const unit = (r.ContentUnit||'') + ' / ' + (r.PriceUnit||'');
+return `<tr>
+<td>${r.ProductID}</td>
+<td>${r.Category||''}</td>
+<td>${r.Name||''}</td>
+<td>${unit}</td>
+<td style="text-align:right">${r.DispensaryPrice||0}</td>
+<td style="text-align:right">${r.MarketPrice||0}</td>
+<td style="text-align:center">${r.Active? '1':'0'}</td>
+<td><button data-id="${r.ProductID}" data-name="${encodeURIComponent(r.Name||'')}" class="btn-fill">Fyll skjema</button></td>
+</tr>`;
+}).join('');
+Array.from(tb.querySelectorAll('.btn-fill')).forEach(btn=>{
+btn.addEventListener('click', function(){
+const id=this.getAttribute('data-id');
+const row = (list||[]).find(x=>x.ProductID===id);
+if(!row) return;
+E('p_id').value=row.ProductID;
+E('p_cat').value=row.Category||'';
+E('p_name').value=row.Name||'';
+E('p_unit').value=row.ContentUnit||'g';
+E('p_punit').value=row.PriceUnit||'g';
+E('p_dprice').value=row.DispensaryPrice||0;
+E('p_mprice').value=row.MarketPrice||0;
+E('p_active').checked=!!row.Active;
+E('b_pid').value=row.ProductID;
+E('b_msg').textContent='';
+E('p_msg').textContent='';
+});
+});
+E('stat').textContent=rows.length+' produkter';
+}).withFailureHandler(function(e){
+E('stat').textContent='Feil: '+String(e && (e.message||e));
+}).adminListProducts();
+}
+
+function save(){
+const p={
+ProductID:E('p_id').value.trim(),
+Category:E('p_cat').value.trim(),
+Name:E('p_name').value.trim(),
+ContentUnit:E('p_unit').value.trim()||'g',
+PriceUnit:E('p_punit').value.trim()||'g',
+DispensaryPrice:Number(E('p_dprice').value)||0,
+MarketPrice:Number(E('p_mprice').value)||0,
+Active:E('p_active').checked
+};
+if(!p.ProductID){ E('p_msg').textContent='ProductID kreves'; return; }
+google.script.run.withSuccessHandler(function(ok){
+E('p_msg').textContent= ok? 'Lagret' : 'Feil ved lagring';
+load();
+}).withFailureHandler(function(e){
+E('p_msg').textContent='Feil: '+String(e && (e.message||e));
+}).adminUpsertProduct(p);
+}
+
+function makeBatch(){
+const pid = E('b_pid').value.trim();
+const mode = E('b_mode').value;
+const count = Math.max(1, parseInt(E('b_count').value||'1',10));
+const opts = { count:count };
+if (mode==='loose'){
+opts.contentQty = Number(E('b_qty').value)||0;
+opts.unit = E('b_unit').value.trim()||'g';
+}
+if(!pid){ E('b_msg').textContent='ProductID kreves'; return; }
+E('b_msg').textContent='Lager pakker...';
+google.script.run.withSuccessHandler(function(res){
+E('b_msg').textContent='Opprettet '+(res && res.created || 0)+' pakker';
+}).withFailureHandler(function(e){
+E('b_msg').textContent='Feil: '+String(e && (e.message||e));
+}).adminBatchCreatePackages(pid, mode, opts);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+E('btn-refresh').addEventListener('click', load);
+E('p_save').addEventListener('click', save);
+E('b_make').addEventListener('click', makeBatch);
+E('q').addEventListener('input', function(){ clearTimeout(window._t); window._t=setTimeout(load,200); });
+load();
+});
+</script>

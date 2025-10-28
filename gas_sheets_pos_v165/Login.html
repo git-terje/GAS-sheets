@@ -1,0 +1,45 @@
+<!-- Login.html | uid/pin -> redirect | v0.6.2 | 2025-10-27 -->
+<?var __EXEC = EXEC_URL; ?>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Logg inn</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body{margin:0;background:#0e1512;color:#e6f0ec;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    .wrap{max-width:420px;margin:10vh auto;padding:16px;border:1px solid #16352b;border-radius:10px;background:#0f1a16}
+    .row{display:flex;gap:8px;align-items:center;margin:8px 0}
+    input{width:100%;background:#0b1a15;color:#e6f0ec;border:1px solid #27433a;border-radius:8px;padding:.6rem .7rem}
+    .btn{width:100%;appearance:none;border:0;border-radius:8px;padding:.7rem .9rem;background:#2da37e;color:#05130f;font-weight:700;cursor:pointer}
+    .muted{color:#9cc6b8}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Logg inn</h1>
+    <div class="row"><input id="uid" placeholder="uid"></div>
+    <div class="row"><input id="pin" placeholder="pin/kodeord" type="password"></div>
+    <div class="row"><button class="btn" onclick="login()">Logg inn</button></div>
+    <div id="msg" class="muted"></div>
+  </div>
+
+  <script>
+    var EXEC = "<?= __EXEC ?>";
+    function login(){
+      var uid=(document.getElementById('uid').value||'').trim();
+      var pin=(document.getElementById('pin').value||'').trim();
+      if(!uid||!pin){ document.getElementById('msg').textContent='uid og pin kreves'; return; }
+      google.script.run.withSuccessHandler(function(res){
+        if(!res||!res.ok){ document.getElementById('msg').textContent='Feil uid/pin'; return; }
+        var roleLower = String(res.role||'').toLowerCase();
+        var next = encodeURIComponent(res.next||'POSpanel');
+        var q = function(p){ return encodeURIComponent(p); };
+        window.location.href = EXEC + '?panel=' + next + '&uid=' + q(uid) + '&role=' + q(roleLower);
+      }).withFailureHandler(function(e){
+        document.getElementById('msg').textContent = e && e.message || String(e);
+      }).svcLogin(uid, pin);
+    }
+  </script>
+</body>
+</html>

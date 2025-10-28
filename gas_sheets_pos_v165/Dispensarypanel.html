@@ -1,0 +1,120 @@
+<!-- Dispensarypanel.html | v0.7.0 | 2025-10-27 | split view local vs central + orders + visibility -->
+<?var __EXEC = EXEC_URL, __UID = (UID||''), __ROLE = (ROLE||''); ?>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Dispensary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>window.__EXEC_URL="<?= __EXEC ?>";window.__UID="<?= __UID ?>";window.__ROLE="<?= __ROLE ?>";</script>
+  <style>
+    body{margin:0;background:#0e1512;color:#e6f0ec;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    .wrap{padding:16px}
+    .grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
+    .card{padding:12px;border:1px solid #16352b;border-radius:10px;background:#0f1a16}
+    table{border-collapse:collapse;width:100%;background:#0f1a16}
+    th,td{border:1px solid #1b2c26;padding:6px 8px;font-size:.92rem}
+    th{background:#13221d;color:#cfe5dd;text-align:left}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    input,select{background:#0b1a15;color:#e6f0ec;border:1px solid #27433a;border-radius:8px;padding:.45rem .6rem}
+    .btn{appearance:none;border:0;border-radius:8px;padding:.5rem .7rem;background:#2da37e;color:#05130f;font-weight:700;cursor:pointer}
+    .muted{color:#9cc6b8}
+  </style>
+</head>
+<body>
+  <?!= include('TopNav') ?>
+  <div class="wrap grid">
+    <div class="card">
+      <div class="row"><h2>Local stock</h2><button class="btn" onclick="loadLocal()">Reload</button></div>
+      <table id="tblLocal"><thead><tr><th>SKU</th><th>Qty</th><th>Updated</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card">
+      <div class="row"><h2>Central stock</h2><button class="btn" onclick="loadCentral()">Reload</button></div>
+      <table id="tblCentral"><thead><tr><th>SKU</th><th>Qty</th><th>Updated</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Order from central</h2></div>
+      <div class="row">
+        <input id="o_sku" placeholder="SKU/ProductCode">
+        <input id="o_qty" placeholder="Qty" type="number" min="1" step="1">
+        <button class="btn" onclick="createOrder()">Request</button>
+      </div>
+      <div class="row"><button class="btn" onclick="loadOrders()">Reload orders</button></div>
+      <table id="tblOrders"><thead><tr><th>OrderID</th><th>SKU</th><th>Qty</th><th>Status</th><th>Created</th></tr></thead><tbody></tbody></table>
+      <div id="o_msg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>POS visibility</h2></div>
+      <div class="row">
+        <input id="v_sku" placeholder="SKU/ProductCode">
+        <select id="v_visible"><option value="1">visible</option><option value="0">hidden</option></select>
+        <input id="v_plan" type="date" placeholder="Planned arrival">
+        <button class="btn" onclick="setVisible()">Save</button>
+      </div>
+      <div class="row"><button class="btn" onclick="loadVisibility()">Reload visibility</button></div>
+      <table id="tblVis"><thead><tr><th>SKU</th><th>Visible</th><th>Planned</th><th>Updated</th></tr></thead><tbody></tbody></table>
+      <div id="v_msg" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Packaging PO</h2></div>
+      <div class="row">
+        <input id="p_type" placeholder="PackageType e.g. BLACKBAG">
+        <input id="p_size" placeholder="SizeCode e.g. 1G">
+        <input id="p_qty" type="number" min="1" step="1" placeholder="Qty">
+        <button class="btn" onclick="createPO()">Request PO</button>
+      </div>
+      <div id="p_msg" class="muted"></div>
+    </div>
+  </div>
+
+  <script>
+    function setRows(sel, rows, pick){
+      const tb=document.querySelector(sel); if(!tb) return;
+      tb.innerHTML = rows.map(pick).map(tr=>'<tr>'+tr.map(td=>'<td>'+td+'</td>').join('')+'</tr>').join('');
+    }
+    function loadLocal(){ google.script.run.withSuccessHandler(list=>{
+      setRows('#tblLocal tbody', list||[], x=>[x.SKU,x.QtyAvailable,x.UpdatedISO]);
+    }).withFailureHandler(console.error).dispListLocalStock(window.__UID); }
+    function loadCentral(){ google.script.run.withSuccessHandler(list=>{
+      setRows('#tblCentral tbody', list||[], x=>[x.SKU,x.QtyAvailable,x.UpdatedISO]);
+    }).withFailureHandler(console.error).dispListCentralStock(); }
+    function createOrder(){
+      const sku=(document.getElementById('o_sku').value||'').trim();
+      const qty=Number(document.getElementById('o_qty').value||0);
+      if(!sku||qty<1){ document.getElementById('o_msg').textContent='sku/qty'; return; }
+      google.script.run.withSuccessHandler(res=>{
+        document.getElementById('o_msg').textContent = res&&res.ok ? 'OK' : 'Fail';
+        loadOrders();
+      }).withFailureHandler(e=>document.getElementById('o_msg').textContent=e.message||String(e)).dispCreateOrder(window.__UID, sku, qty);
+    }
+    function loadOrders(){ google.script.run.withSuccessHandler(list=>{
+      setRows('#tblOrders tbody', list||[], x=>[x.OrderID,x.SKU,x.Qty,x.Status,x.CreatedISO]);
+    }).withFailureHandler(console.error).dispListOrders(window.__UID); }
+    function setVisible(){
+      const sku=(document.getElementById('v_sku').value||'').trim();
+      const vis=document.getElementById('v_visible').value==='1';
+      const plan=(document.getElementById('v_plan').value||'').trim();
+      if(!sku){ document.getElementById('v_msg').textContent='sku'; return; }
+      google.script.run.withSuccessHandler(_=>{ document.getElementById('v_msg').textContent='saved'; loadVisibility(); })
+        .withFailureHandler(e=>document.getElementById('v_msg').textContent=e.message||String(e))
+        .dispUpsertVisibility(window.__UID, sku, vis, plan);
+    }
+    function loadVisibility(){ google.script.run.withSuccessHandler(list=>{
+      setRows('#tblVis tbody', list||[], x=>[x.SKU, x.Visible?'1':'0', x.PlannedArrivalISO||'', x.UpdatedISO||'']);
+    }).withFailureHandler(console.error).dispListVisibility(window.__UID); }
+    function createPO(){
+      const t=(document.getElementById('p_type').value||'').trim();
+      const s=(document.getElementById('p_size').value||'').trim();
+      const q=Number(document.getElementById('p_qty').value||0);
+      if(!t||!s||q<1){ document.getElementById('p_msg').textContent='type/size/qty'; return; }
+      google.script.run.withSuccessHandler(res=>{
+        document.getElementById('p_msg').textContent = res&&res.ok ? 'OK' : 'Fail';
+      }).withFailureHandler(e=>document.getElementById('p_msg').textContent=e.message||String(e)).dispCreatePackagingPO(window.__UID, t, s, q);
+    }
+    document.addEventListener('DOMContentLoaded', function(){ loadLocal(); loadCentral(); loadOrders(); loadVisibility(); });
+  </script>
+</body>
+</html>

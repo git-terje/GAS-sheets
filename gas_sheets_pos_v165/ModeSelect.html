@@ -1,0 +1,66 @@
+<!-- ModeSelect.html — v0.6.10 — Valgskjerm etter innlogging: Dashboard eller POS -->
+<section style="max-width:720px;margin:40px auto;font-family:system-ui,Segoe UI,Arial">
+<h2 style="margin:0 0 16px">Velg arbeidsflate</h2>
+<p style="color:#444;margin:0 0 20px">Velg hvor du vil starte.</p>
+
+<div id="msg" style="color:#444;margin-bottom:14px"></div>
+
+<div style="display:flex;gap:16px;flex-wrap:wrap">
+<button id="btn-dash" style="flex:1 1 240px;padding:16px 20px;font-size:18px;border-radius:10px;border:1px solid #ccc;cursor:pointer">
+🗂️ Dashboard
+</button>
+<button id="btn-pos" style="flex:1 1 240px;padding:16px 20px;font-size:18px;border-radius:10px;border:1px solid #ccc;cursor:pointer">
+🧾 POS
+</button>
+</div>
+
+<div style="margin-top:20px">
+<a href="#" id="logout" style="color:#c00">Logg ut</a>
+</div>
+</section>
+
+<script>
+(function(){
+let execUrl='', dashPanel='', hasDash=false, hasPOS=false;
+
+function setEnabled(el, on){
+el.disabled = !on;
+el.style.opacity = on? '1':'0.45';
+el.style.cursor = on? 'pointer':'not-allowed';
+}
+function go(panel){
+if(!panel) return;
+window.top.location.href = execUrl + '?panel=' + encodeURIComponent(panel);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+const bDash=document.getElementById('btn-dash');
+const bPOS =document.getElementById('btn-pos');
+const msg =document.getElementById('msg');
+
+bDash.addEventListener('click', ()=>{ if(hasDash) go(dashPanel); });
+bPOS .addEventListener('click', ()=>{ if(hasPOS) go('POSpanel'); });
+
+document.getElementById('logout').addEventListener('click', function(e){
+e.preventDefault();
+google.script.run.withSuccessHandler(function(){
+window.top.location.href = window.location.href.replace(/(\?|$).*/,'');
+}).logout();
+});
+
+google.script.run.withSuccessHandler(function(res){
+execUrl = res&&res.execUrl || '';
+dashPanel = res&&res.dashPanel || '';
+hasDash = !!(res&&res.hasDash);
+hasPOS = !!(res&&res.hasPOS);
+
+setEnabled(bDash, hasDash);
+setEnabled(bPOS, hasPOS);
+
+if(hasDash && !hasPOS){ msg.textContent='POS ikke tilgjengelig for din bruker.'; }
+else if(!hasDash && hasPOS){ msg.textContent='Dashboard ikke tilgjengelig for din bruker.'; }
+else { msg.textContent=''; }
+}).svcModeOptions();
+});
+}());
+</script>

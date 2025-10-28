@@ -1,0 +1,50 @@
+<!-- TopNav.html — v0.5.0 | standard topnav, exec-safe lenker, WOTD for admin/disp -->
+<?var __EXEC = EXEC_URL, __UID = (UID||''), __ROLE = (ROLE||''); ?>
+<style>
+  .topnav{display:flex;align-items:center;gap:16px;padding:10px 14px;background:#0a2a21;color:#e6f0ec}
+  .topnav a{color:#d7efe6;text-decoration:none;padding:6px 10px;border-radius:8px;border:1px solid #184c3d;background:#0f3a2e}
+  .topnav a:hover{background:#125443}
+  .spacer{flex:1}
+  .badge{padding:4px 8px;border:1px solid #2a6d5a;border-radius:999px;background:#0f3a2e;color:#a9e3d2;font-size:.9rem}
+</style>
+<nav class="topnav">
+  <a data-panel="POSpanel" target="_top">POS</a>
+  <a data-panel="Adminpanel" target="_top" data-role="admin">Admin</a>
+  <a data-panel="Dispensarypanel" target="_top" data-role-any="admin,disp">Dispensary</a>
+  <span id="wotd" class="badge" title="Word of the day"></span>
+  <div class="spacer"></div>
+  <span class="badge" id="who"></span>
+  <a data-panel="Login" target="_top" id="logout">Logg ut</a>
+</nav>
+<script>
+  (function(){
+    const EXEC = "<?= __EXEC ?>";
+    const UID  = "<?= __UID ?>";
+    const ROLE = String("<?= __ROLE ?>").toLowerCase();
+
+    // merk hvem
+    document.getElementById('who').textContent = (UID||'guest')+' · '+(ROLE||'guest');
+
+    // bygg lenker
+    document.querySelectorAll('a[data-panel]').forEach(a=>{
+      const p=a.getAttribute('data-panel');
+      a.href = EXEC + '?panel='+encodeURIComponent(p)+'&uid='+encodeURIComponent(UID)+'&role='+encodeURIComponent(ROLE);
+    });
+
+    // rollefiltrering
+    document.querySelectorAll('[data-role]').forEach(el=>{
+      if(String(el.getAttribute('data-role'))!==ROLE) el.remove();
+    });
+    document.querySelectorAll('[data-role-any]').forEach(el=>{
+      const ok = String(el.getAttribute('data-role-any')).split(',').map(s=>s.trim()).includes(ROLE);
+      if(!ok) el.remove();
+    });
+
+    // WOTD: vis ord kun for admin/disp
+    const w = document.getElementById('wotd');
+    google.script.run.withSuccessHandler(res=>{
+      if(res && res.word){ w.textContent = res.word; }
+      else { w.remove(); }
+    }).withFailureHandler(function(){}).svcGetWordOfToday(ROLE);
+  })();
+</script>
