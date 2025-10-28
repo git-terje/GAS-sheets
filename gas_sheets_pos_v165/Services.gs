@@ -13,3 +13,10 @@ function svcGetStock(dispId) {
   return { central, local, packaging };
 }
 
+function svcSubmitOrder(uid, po) {
+  po.status = "submitted";
+  po.submitTs = new Date();
+  po.submitBy = uid;
+  appendRow("PurchaseOrders", po);
+}
+
