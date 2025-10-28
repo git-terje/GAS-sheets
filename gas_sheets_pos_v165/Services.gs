@@ -19,4 +19,16 @@ function svcSubmitOrder(uid, po) {
   po.submitBy = uid;
   appendRow("PurchaseOrders", po);
 }
+function svcGetPOs(role, uid) {
+  let rows = getTable("PurchaseOrders");
+  if (role === "disp") rows = rows.filter(r => r.submitBy === uid);
+  return rows;
+}
+
+
+function svcGetPOs(role, uid) {
+  let rows = getTable("PurchaseOrders");
+  if (role === "disp") rows = rows.filter(r => r.submitBy === uid);
+  return rows;
+}
 
