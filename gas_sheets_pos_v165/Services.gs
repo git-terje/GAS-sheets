@@ -25,6 +25,17 @@ function svcGetPOs(role, uid) {
   return rows;
 }
 
+function svcMarkPOready(id) {
+  updateRow("PurchaseOrders", id, { status: "ready" });
+}
+
+function svcApprovePO(id) {
+  updateRow("PurchaseOrders", id, { status: "approved" });
+}
+
+function svcMarkPOreceived(id) {
+  updateRow("PurchaseOrders", id, { status: "received" });
+}
 
 function svcGetPOs(role, uid) {
   let rows = getTable("PurchaseOrders");
